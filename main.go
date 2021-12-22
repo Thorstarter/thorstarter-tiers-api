@@ -29,10 +29,22 @@ const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
 const contractTiersAddress = "0x817ba0ecafD58460bC215316a7831220BFF11C80"
 const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfoTotal","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
 
-var idoCutoff = map[string]time.Time{"mnet": time.Date(2021, 11, 24, 15, 0, 0, 0, time.UTC)}
-var idoSize = map[string]float64{"mnet": 150000}
-var idoTiers = map[string][]float64{"mnet": []float64{0, 2500, 7500, 25000, 75000, 150000}}
-var idoTiersMul = map[string][]float64{"mnet": []float64{0.25, 1, 2, 4, 8, 12}}
+var idoCutoff = map[string]time.Time{
+	"mnet":  time.Date(2021, 11, 24, 15, 0, 0, 0, time.UTC),
+	"luart": time.Date(2022, 1, 2, 12, 0, 0, 0, time.UTC),
+}
+var idoSize = map[string]float64{
+	"mnet":  150000,
+	"luart": 500000,
+}
+var idoTiers = map[string][]float64{
+	"mnet":  []float64{0, 2500, 7500, 25000, 75000, 150000},
+	"luart": []float64{0, 2500, 7500, 25000, 75000, 150000},
+}
+var idoTiersMul = map[string][]float64{
+	"mnet":  []float64{0.25, 1, 2, 4, 8, 12},
+	"luart": []float64{0.25, 1, 2, 4, 8, 12},
+}
 
 type J map[string]interface{}
 
@@ -203,12 +215,12 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	registrations := DbSelect(`select id from registrations where ido = $1 and address = $2`, ido, account.String())
 	if len(registrations) > 0 {
-		RenderJson(w, J{"error": "already registered"})
-		return
+		db.MustExec(`update registrations set tiers = $2, xrune = $3, bonus = $4, address_terra = $5, updated_at = now() where id = $1`,
+			registrations[0]["id"], tier, xrune, bonus, registration["terra"].(string))
+	} else {
+		db.MustExec(`insert into registrations (id, ido, address, tier, xrune, bonus, address_terra, iphash) values ($1, $2, $3, $4, $5, $6, $7)`,
+			SUUID(), ido, account.String(), tier, xrune, bonus, registration["terra"].(string), fmt.Sprintf("%x", iphash[:]))
 	}
-
-	db.MustExec(`insert into registrations (id, ido, address, tier, xrune, bonus, iphash) values ($1, $2, $3, $4, $5, $6, $7)`,
-		SUUID(), ido, account.String(), tier, xrune, bonus, fmt.Sprintf("%x", iphash[:]))
 	RenderJson(w, J{"message": "ok"})
 }
 
