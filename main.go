@@ -218,7 +218,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		db.MustExec(`update registrations set tiers = $2, xrune = $3, bonus = $4, address_terra = $5, updated_at = now() where id = $1`,
 			registrations[0]["id"], tier, xrune, bonus, registration["terra"].(string))
 	} else {
-		db.MustExec(`insert into registrations (id, ido, address, tier, xrune, bonus, address_terra, iphash) values ($1, $2, $3, $4, $5, $6, $7)`,
+		db.MustExec(`insert into registrations (id, ido, address, tier, xrune, bonus, address_terra, iphash) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
 			SUUID(), ido, account.String(), tier, xrune, bonus, registration["terra"].(string), fmt.Sprintf("%x", iphash[:]))
 	}
 	RenderJson(w, J{"message": "ok"})
