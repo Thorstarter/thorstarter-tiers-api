@@ -148,6 +148,7 @@ func main() {
 	mux.HandleFunc("/stats", handleStats)
 	mux.HandleFunc("/user", handleUser)
 	mux.HandleFunc("/register", handleRegister)
+	mux.HandleFunc("/kyc-start", handleKycStart)
 	//mux.HandleFunc("/admin/bots", handleAdminBots)
 	//mux.HandleFunc("/admin/kill-bots", handleAdminKillBots)
 	//mux.HandleFunc("/admin/snapshot", handleAdminSnapshot)
@@ -222,6 +223,52 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 			SUUID(), ido, account.String(), tier, xrune, bonus, registration["terra"].(string), fmt.Sprintf("%x", iphash[:]))
 	}
 	RenderJson(w, J{"message": "ok"})
+}
+
+func handleKycStart(w http.ResponseWriter, r *http.Request) {
+	address := r.URL.Query().Get("address")
+	kyc := DbSelect(`select * from kyc where address = $1`, address)
+	if len(kyc) > 0 {
+		sessionId := kyc[0]["session_id"].(string)
+		req, err := http.NewRequest("GET", "https://individual-api.synaps.io/v3/session/info", nil)
+		req.Header.Set("Client-Id", Getenv("SYNAPS_CLIENT_ID", ""))
+		req.Header.Set("Api-Key", Getenv("SYNAPS_API_KEY", ""))
+		req.Header.Set("Session-Id", sessionId)
+		Check(err)
+		res, err := http.DefaultClient.Do(req)
+		Check(err)
+		body, err := io.ReadAll(res.Body)
+		Check(err)
+		log.Println("synaps", string(body))
+		var v map[string]interface{}
+		Check(json.Unmarshal(body, &v))
+		if v["status"].(string) == "CANCELLED" {
+			sessionId = synapsGetSessionId(address)
+			db.MustExec(`update kyc set session_id = $2 where id = $1`,
+				kyc[0]["id"].(string), sessionId)
+		}
+		RenderJson(w, J{"session_id": sessionId, "verified": v["status"].(string) == "VERIFIED"})
+	} else {
+		sessionId := synapsGetSessionId(address)
+		db.MustExec(`insert into kyc (id, address, session_id) values ($1, $2, $3)`,
+			SUUID(), address, sessionId)
+		RenderJson(w, J{"session_id": sessionId, "verified": false})
+	}
+}
+
+func synapsGetSessionId(address string) string {
+	req, err := http.NewRequest("POST", "https://individual-api.synaps.io/v3/session/init?alias="+address, nil)
+	req.Header.Set("Client-Id", Getenv("SYNAPS_CLIENT_ID", ""))
+	req.Header.Set("Api-Key", Getenv("SYNAPS_API_KEY", ""))
+	Check(err)
+	res, err := http.DefaultClient.Do(req)
+	Check(err)
+	body, err := io.ReadAll(res.Body)
+	Check(err)
+	log.Println("synaps", string(body))
+	var v map[string]interface{}
+	Check(json.Unmarshal(body, &v))
+	return v["session_id"].(string)
 }
 
 func fetchBots(ido string) []J {
