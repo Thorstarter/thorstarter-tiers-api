@@ -216,7 +216,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	registrations := DbSelect(`select id from registrations where ido = $1 and address = $2`, ido, account.String())
 	if len(registrations) > 0 {
-		db.MustExec(`update registrations set tiers = $2, xrune = $3, bonus = $4, address_terra = $5, updated_at = now() where id = $1`,
+		db.MustExec(`update registrations set tier = $2, xrune = $3, bonus = $4, address_terra = $5, updated_at = now() where id = $1`,
 			registrations[0]["id"], tier, xrune, bonus, registration["terra"].(string))
 	} else {
 		db.MustExec(`insert into registrations (id, ido, address, tier, xrune, bonus, address_terra, iphash) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
