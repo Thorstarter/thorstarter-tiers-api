@@ -31,7 +31,7 @@ const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user"
 
 var idoCutoff = map[string]time.Time{
 	"mnet":  time.Date(2021, 11, 24, 15, 0, 0, 0, time.UTC),
-	"luart": time.Date(2022, 1, 2, 12, 0, 0, 0, time.UTC),
+	"luart": time.Date(2022, 1, 3, 9, 30, 0, 0, time.UTC),
 }
 var idoSize = map[string]float64{
 	"mnet":  150000,
