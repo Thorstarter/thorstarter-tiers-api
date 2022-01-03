@@ -149,7 +149,7 @@ func main() {
 	mux.HandleFunc("/kyc-start", handleKycStart)
 	//mux.HandleFunc("/admin/bots", handleAdminBots)
 	//mux.HandleFunc("/admin/kill-bots", handleAdminKillBots)
-	//mux.HandleFunc("/admin/snapshot", handleAdminSnapshot)
+	mux.HandleFunc("/admin/snapshot", handleAdminSnapshot)
 	mux.HandleFunc("/", handleIndex)
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("request", r.Method, r.URL.String())
@@ -190,8 +190,10 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 
 func handleUser(w http.ResponseWriter, r *http.Request) {
 	address := strings.ToLower(r.URL.Query().Get("address"))
-	account := common.HexToAddress(address)
-	registrations := DbSelect(`select ido, tier, created_at from registrations where address = $1`, account.String())
+	if strings.HasPrefix(address, "0x") {
+		address = common.HexToAddress(address).String()
+	}
+	registrations := DbSelect(`select ido, tier, created_at from registrations where address = $1`, address)
 	RenderJson(w, J{"registrations": registrations})
 }
 
@@ -277,6 +279,9 @@ func synapsApiCall(method string, path string, sessionId string) (map[string]int
 		return nil, err
 	}
 	log.Println("synaps", method, path, string(body))
+	if res.StatusCode >= 400 {
+		return nil, fmt.Errorf("synapsApiCall: error: %d: %s", res.StatusCode, string(body))
+	}
 	var v map[string]interface{}
 	err = json.Unmarshal(body, &v)
 	return v, err
