@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -204,7 +202,10 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	registration := J{}
 	ReqBody(r, &registration)
-	account := common.HexToAddress(registration["address"].(string))
+	account := registration["address"].(string)
+	if strings.HasPrefix(account, "0x") {
+		account = common.HexToAddress(account).String()
+	}
 	tier := MustParseInt(registration["tier"].(string))
 	xrune := MustParseInt(registration["xrune"].(string))
 	bonus := MustParseInt(registration["bonus"].(string))
@@ -214,13 +215,13 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	registrations := DbSelect(`select id from registrations where ido = $1 and address = $2`, ido, account.String())
+	registrations := DbSelect(`select id from registrations where ido = $1 and address = $2`, ido, account)
 	if len(registrations) > 0 {
 		db.MustExec(`update registrations set tier = $2, xrune = $3, bonus = $4, address_terra = $5, updated_at = now() where id = $1`,
 			registrations[0]["id"], tier, xrune, bonus, registration["terra"].(string))
 	} else {
 		db.MustExec(`insert into registrations (id, ido, address, tier, xrune, bonus, address_terra, iphash) values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-			SUUID(), ido, account.String(), tier, xrune, bonus, registration["terra"].(string), fmt.Sprintf("%x", iphash[:]))
+			SUUID(), ido, account, tier, xrune, bonus, registration["terra"].(string), fmt.Sprintf("%x", iphash[:]))
 	}
 	RenderJson(w, J{"message": "ok"})
 }
@@ -293,7 +294,7 @@ func fetchBots(ido string) []J {
 	}
 	filteredAddresses := []J{}
 	for _, a := range addresses {
-		if addressSafe[a["address"].(string)] && a["iphash"].(string)[:8] != "79b734ba" {
+		if addressSafe[a["address"].(string)] {
 			continue
 		}
 		// if iphashCount[a["iphash"].(string)] <= 3 {
@@ -339,45 +340,77 @@ func handleAdminKillBots(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 	ido := strings.ToLower(r.URL.Query().Get("ido"))
-	addresses := DbSelect(`select address from registrations where ido = $1 and bonus >= 0 and created_at <= $2 order by id`, ido, idoCutoff[ido])
+	addresses := DbSelect(`select address, address_terra, xrune, tier from registrations r where ido = $1 and xrune > 0 and bonus >= 0 and created_at <= $2 and address_terra != '' and starts_with(address_terra, 'terra') order by id`, ido, idoCutoff[ido])
 	totalAllocations := float64(0)
 	totalInTier := map[int]float64{}
 	for i, a := range addresses {
-		fmt.Println("fetching", len(addresses), a, i+1)
-		data, err := contractTiers.Pack("userInfoTotal", common.HexToAddress(a["address"].(string)))
-		Check(err)
-		var resultStr string
-		Check(client.Call(&resultStr, "eth_call", map[string]interface{}{
-			"from": ADDRESS_ZERO,
-			"to":   contractTiersAddress,
-			"data": hexutil.Bytes(data),
-		}, "latest"))
-
-		result, err := contractTiers.Unpack("userInfoTotal", hexutil.MustDecode(resultStr))
-		Check(err)
-		xruneb := result[1].(*big.Int)
-		xruneb.Div(xruneb, big.NewInt(1000000000))
-		xruneb.Div(xruneb, big.NewInt(1000000000))
-		xruneb.Div(xruneb, big.NewInt(100))
-		xruneb.Mul(xruneb, big.NewInt(100))
-		xrune := float64(xruneb.Int64())
-		tier := 0
-		for i, v := range idoTiers[ido] {
-			if xrune >= v {
-				tier = i
+		fmt.Println("fetching kyc", len(addresses), i+1, a)
+		kycVerified := false
+		sessions := DbSelect(`select id, session_id, verified from kyc where address in ($1, $2)`, a["address"].(string), a["address_terra"].(string))
+		for _, s := range sessions {
+			if s["verified"].(bool) {
+				kycVerified = true
+				continue
+			}
+			sessionId := s["session_id"].(string)
+			resInfo, err := synapsApiCall("GET", "/v3/session/info", sessionId)
+			if err == nil && resInfo["status"].(string) == "VERIFIED" {
+				kycVerified = true
+			}
+			if kycVerified {
+				db.MustExec(`update kyc set verified = true where id = $1`, s["id"].(string))
 			}
 		}
+		a["kyc"] = kycVerified
+		if !kycVerified {
+			continue
+		}
+
+		// if strings.HasPrefix(a["address"].(string), "0x") {
+		// 	fmt.Println("fetching tiers", len(addresses), i+1, a)
+		// 	data, err := contractTiers.Pack("userInfoTotal", common.HexToAddress(a["address"].(string)))
+		// 	Check(err)
+		// 	var resultStr string
+		// 	Check(client.Call(&resultStr, "eth_call", map[string]interface{}{
+		// 		"from": ADDRESS_ZERO,
+		// 		"to":   contractTiersAddress,
+		// 		"data": hexutil.Bytes(data),
+		// 	}, "latest"))
+
+		// 	result, err := contractTiers.Unpack("userInfoTotal", hexutil.MustDecode(resultStr))
+		// 	Check(err)
+		// 	xruneb := result[1].(*big.Int)
+		// 	xruneb.Div(xruneb, big.NewInt(1000000000))
+		// 	xruneb.Div(xruneb, big.NewInt(1000000000))
+		// 	xruneb.Div(xruneb, big.NewInt(100))
+		// 	xruneb.Mul(xruneb, big.NewInt(100))
+		// 	xrune := float64(xruneb.Int64())
+		// 	tier := 0
+		// 	for i, v := range idoTiers[ido] {
+		// 		if xrune >= v {
+		// 			tier = i
+		// 		}
+		// 	}
+		// 	totalInTier[tier] += 1
+		// 	totalAllocations += idoTiersMul[ido][tier]
+		// 	a["xrune"] = xrune
+		// 	a["tier"] = tier
+		// } else {
+		tier := int(a["tier"].(int64))
 		totalInTier[tier] += 1
 		totalAllocations += idoTiersMul[ido][tier]
-		a["xrune"] = xrune
 		a["tier"] = tier
+		a["xrune"] = float64(a["xrune"].(int64))
 	}
 
-	fmt.Fprintf(w, "%.2f %#v\n", totalAllocations, totalInTier)
-	fmt.Fprintf(w, "address,xrune,tier,allocation\n")
 	baseAllocation := idoSize[ido] / totalAllocations
 	tierAllocations := map[int]float64{}
+	fmt.Fprintf(w, "total %.2f base %.2f tiers %#v\n", totalAllocations, baseAllocation, totalInTier)
+	fmt.Fprintf(w, "address,address_terra,xrune,tier,allocation\n")
 	for _, a := range addresses {
+		if !a["kyc"].(bool) {
+			continue
+		}
 		tier := a["tier"].(int)
 		allocation := float64(0)
 		if baseAllocation*idoTiersMul[ido][tier] > 100 {
@@ -389,6 +422,6 @@ func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 				tierAllocations[tier] += 100
 			}
 		}
-		fmt.Fprintf(w, "%s,%.2f,%d,%.2f\n", a["address"].(string), a["xrune"].(float64), tier, allocation)
+		fmt.Fprintf(w, "%s,%s,%.2f,%d,%.2f\n", a["address"].(string), a["address_terra"].(string), a["xrune"].(float64), tier, allocation)
 	}
 }
