@@ -156,8 +156,8 @@ func handleUserFetch(w http.ResponseWriter, r *http.Request) {
 	baseAllocation, snapshotUsers := snapshot("ring", 400000)
 	userInSnapshot := false
 	userAllocation := float64(0)
-	for _, user := range snapshotUsers {
-		if user.Get("user_id") == user.Get("id") {
+	for _, u := range snapshotUsers {
+		if u.Get("user_id") == user.Get("id") {
 			userInSnapshot = true
 			userAllocation = user["allocation"].(float64)
 			break
