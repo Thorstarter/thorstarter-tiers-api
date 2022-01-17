@@ -55,5 +55,6 @@ create table users_registrations (
   id text primary key,
   ido text not null,
   user_id text not null,
+  address text not null,
   created_at timestamptz not null default now()
 );

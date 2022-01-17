@@ -651,7 +651,8 @@ func httpGet(url string) (interface{}, error) {
 	return v, err
 }
 
-const luart2x = `0x6fa398877821C285B961a48A2d315B54c129BCA5,
+const luart2x = `0x41B720be5796ECb7BEB5f712e1cC57dE631240c0,
+0x6fa398877821C285B961a48A2d315B54c129BCA5,
 0x2b0A6d28CE1d149201323971a8BDC544795cf7eB,terra16zrhr55k9syrlmeqtae9ahccpgld843gu04qp6
 0x46adF4507A9eE9333418774628fc70347a6d119E,terra18w5x4jw2kn73tlcu43urnh5y6wt0ddw3vsk9sq
 0x586724B895eA7e866fB743A887a564BF61490f38,terra1hmeaq2xezhvgchgx7yaq0tmmvdjch68v2przn0
@@ -1091,4 +1092,5 @@ const luart2x = `0x6fa398877821C285B961a48A2d315B54c129BCA5,
 ,terra146mtjp6q5vcfwg4n5tdmc7yap5q83m2ru7ylxx
 ,terra187uvap9vac6usvdtjz98gadu36zt6453vlknt0
 ,terra15pkfk4a9m6s72ukarlru865gynmmjgs6xg83uh
-,terra1wljs794krgtceq88wljlpaq5xksw5x3vvdx404`
+,terra1wljs794krgtceq88wljlpaq5xksw5x3vvdx404
+,terra14dh5lrxh4shjcjs7dns2hpdzpcy9jgv9u24hkc`
