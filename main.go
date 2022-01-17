@@ -249,7 +249,7 @@ func handleUserRegister(w http.ResponseWriter, r *http.Request) {
 	if len(registrations) == 0 {
 		db.MustExec("insert into users_registrations (id, ido, user_id, address) values ($1, $2, $3, $4)", SUUID(), ido, userId, address)
 	} else {
-		db.MustExec("update users_registrations address = $2 where id = $1", registrations[0].Get("id"), address)
+		db.MustExec("update users_registrations set address = $2 where id = $1", registrations[0].Get("id"), address)
 	}
 	RenderJson(w, 200, J{})
 }
