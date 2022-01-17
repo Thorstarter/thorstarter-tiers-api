@@ -30,8 +30,13 @@ const allIdos = "mnet,luart,ring"
 const networks = "ethereum,terra,fantom,polygon,solana"
 
 const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
-const contractTiersAddress = "0x817ba0ecafD58460bC215316a7831220BFF11C80"
+const contractTiersAddressEthereum = "0x817ba0ecafD58460bC215316a7831220BFF11C80"
+const contractTiersAddressFantom = "0xbc373f851d1EC6aaba27a9d039948D25a6EE8036"
 const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfoTotal","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
+const contractTiersSimpleABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfos","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
+
+var allTiers = []float64{0, 2500, 7500, 25000, 75000, 150000}
+var allMultipliers = []float64{0, 1, 2, 4, 8, 12}
 
 var idoCutoff = map[string]time.Time{
 	"mnet":  time.Date(2021, 11, 24, 15, 0, 0, 0, time.UTC),
@@ -53,17 +58,23 @@ var idoTiersMul = map[string][]float64{
 type J map[string]interface{}
 
 var db *sqlx.DB
-var client *rpc.Client
+var clientEthereum *rpc.Client
+var clientFantom *rpc.Client
 var contractTiers abi.ABI
+var contractTiersSimple abi.ABI
 
 func main() {
 	var err error
 	db, err = sqlx.Open("postgres", Getenv("DATABASE_URL", "postgres://admin:admin@localhost/ts_tiers_api?sslmode=disable"))
 	Check(err)
 
-	client, err = rpc.DialHTTP(Getenv("ETH_RPC", "https://cloudflare-eth.com/"))
+	clientEthereum, err = rpc.DialHTTP(Getenv("ETH_RPC", "https://cloudflare-eth.com/"))
+	Check(err)
+	clientFantom, err = rpc.DialHTTP(Getenv("ETH_RPC", "https://rpc.fantom.network"))
 	Check(err)
 	contractTiers, err = abi.JSON(strings.NewReader(contractTiersABI))
+	Check(err)
+	contractTiersSimple, err = abi.JSON(strings.NewReader(contractTiersSimpleABI))
 	Check(err)
 
 	mux := http.NewServeMux()
@@ -140,11 +151,25 @@ func handleUserFetch(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
+	delete(user, "iphash")
 	registrations := DbSelect("select * from users_registrations where user_id = $1", user.Get("id"))
+	baseAllocation, snapshotUsers := snapshot("ring", 400000)
+	userInSnapshot := false
+	userAllocation := float64(0)
+	for _, user := range snapshotUsers {
+		if user.Get("user_id") == user.Get("id") {
+			userInSnapshot = true
+			userAllocation = user["allocation"].(float64)
+			break
+		}
+	}
 	RenderJson(w, 200, J{
-		"user":          user,
-		"registrations": registrations,
-		"luart2x":       strings.Contains(luart2x, address),
+		"user":           user,
+		"registrations":  registrations,
+		"luart2x":        strings.Contains(luart2x, address),
+		"baseAllocation": baseAllocation,
+		"userInSnapshot": userInSnapshot,
+		"userAllocation": userAllocation,
 	})
 }
 
@@ -154,9 +179,9 @@ func fetchUpdateUserAmounts(user J) {
 		data, err := contractTiers.Pack("userInfoTotal", common.HexToAddress(address))
 		Check(err)
 		var resultStr string
-		err = client.Call(&resultStr, "eth_call", map[string]interface{}{
+		err = clientEthereum.Call(&resultStr, "eth_call", map[string]interface{}{
 			"from": ADDRESS_ZERO,
-			"to":   contractTiersAddress,
+			"to":   contractTiersAddressEthereum,
 			"data": hexutil.Bytes(data),
 		}, "latest")
 		if err == nil {
@@ -182,6 +207,28 @@ func fetchUpdateUserAmounts(user J) {
 			user["amount_terra"] = int(balance.Int64())
 		} else {
 			log.Println("fetchUpdateUserAmounts: terra:", address, err)
+		}
+	}
+
+	// Fantom
+	if address := user.Get("address_fantom"); address != "" {
+		data, err := contractTiersSimple.Pack("userInfos", common.HexToAddress(address))
+		Check(err)
+		var resultStr string
+		err = clientFantom.Call(&resultStr, "eth_call", map[string]interface{}{
+			"from": ADDRESS_ZERO,
+			"to":   contractTiersAddressFantom,
+			"data": hexutil.Bytes(data),
+		}, "latest")
+		if err == nil {
+			result, err := contractTiers.Unpack("userInfos", hexutil.MustDecode(resultStr))
+			Check(err)
+			amountb := result[1].(*big.Int)
+			amountb.Div(amountb, big.NewInt(1000000000))
+			amountb.Div(amountb, big.NewInt(1000000000))
+			user["amount_fantom"] = int(amountb.Int64())
+		} else {
+			log.Println("fetchUpdateUserAmounts: fantom:", address, err)
 		}
 	}
 
@@ -227,6 +274,62 @@ func fetchUpdateUserAmounts(user J) {
 			}
 		}
 	}
+}
+
+func snapshot(ido string, size float64) (float64, []J) {
+	users := DbSelect(`select r.id, r.user_id, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 order by r.created_at`, ido)
+
+	totalAllocations := float64(0)
+	totalInTier := map[int]float64{}
+	tierAllocations := map[int]float64{}
+	iphashes := map[string]int{}
+
+	for i, user := range users {
+		if iphashes[user.Get("iphash")] >= 3 {
+			continue
+		}
+		iphashes[user.Get("iphash")]++
+
+		total := float64(user.GetInt("total"))
+		tier := int(0)
+		for i = len(allTiers) - 1; i > 0; i-- {
+			if total >= allTiers[i] {
+				tier = i
+				break
+			}
+		}
+		totalInTier[tier] += 1
+		totalAllocations += allMultipliers[tier]
+		if strings.Contains(luart2x, user.Get("address")) {
+			totalAllocations += allMultipliers[tier]
+		}
+		user["tier"] = tier
+	}
+
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].Get("id") > users[j].Get("id")
+	})
+
+	baseAllocation := size / totalAllocations
+	for _, user := range users {
+		tier := user.GetInt("tier")
+		allocation := float64(0)
+		if baseAllocation*allMultipliers[tier] > 100 {
+			allocation = baseAllocation * allMultipliers[tier]
+		} else {
+			tierAllocationCap := totalInTier[tier] * allMultipliers[tier] * baseAllocation
+			if tierAllocations[tier]+100 < tierAllocationCap {
+				allocation = 100
+				tierAllocations[tier] += 100
+			}
+		}
+		if strings.Contains(luart2x, user.Get("address")) {
+			allocation = allocation * 2
+		}
+		user["allocation"] = allocation
+	}
+
+	return baseAllocation, users
 }
 
 func handleUserRegister(w http.ResponseWriter, r *http.Request) {
@@ -382,7 +485,7 @@ func fetchBots(ido string) []J {
 		// }
 		// account := common.HexToAddress(a["address"].(string))
 		// var resultStr string
-		// Check(client.Call(&resultStr, "eth_getTransactionCount", account, "latest"))
+		// Check(clientEthereum.Call(&resultStr, "eth_getTransactionCount", account, "latest"))
 		// nonce, ok := new(big.Int).SetString(resultStr[2:], 16)
 		// if !ok {
 		// 	panic("failed to parse big int: " + resultStr)
@@ -451,9 +554,9 @@ func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 		// 	data, err := contractTiers.Pack("userInfoTotal", common.HexToAddress(a["address"].(string)))
 		// 	Check(err)
 		// 	var resultStr string
-		// 	Check(client.Call(&resultStr, "eth_call", map[string]interface{}{
+		// 	Check(clientEthereum.Call(&resultStr, "eth_call", map[string]interface{}{
 		// 		"from": ADDRESS_ZERO,
-		// 		"to":   contractTiersAddress,
+		// 		"to":   contractTiersAddressEthereum,
 		// 		"data": hexutil.Bytes(data),
 		// 	}, "latest"))
 
@@ -519,6 +622,12 @@ func (j J) Get(k string) string {
 func (j J) GetInt(k string) int {
 	if v, ok := j[k].(int); ok {
 		return v
+	}
+	if v, ok := j[k].(int64); ok {
+		return int(v)
+	}
+	if v, ok := j[k].(float64); ok {
+		return int(v)
 	}
 	return 0
 }
