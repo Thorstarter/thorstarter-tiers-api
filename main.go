@@ -247,7 +247,7 @@ func handleUserRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	registrations := DbSelect("select * from users_registrations where user_id = $1 and ido = $2", userId, ido)
 	if len(registrations) == 0 {
-		db.MustExec("insert into users_registrations (id, ido, user_id, address) values ($1, $2, $3, $3)", SUUID(), ido, userId, address)
+		db.MustExec("insert into users_registrations (id, ido, user_id, address) values ($1, $2, $3, $4)", SUUID(), ido, userId, address)
 	} else {
 		db.MustExec("update users_registrations address = $2 where id = $1", registrations[0].Get("id"), address)
 	}
