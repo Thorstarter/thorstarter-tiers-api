@@ -283,6 +283,7 @@ func snapshot(ido string, size float64) (float64, []J) {
 	totalInTier := map[int]float64{}
 	tierAllocations := map[int]float64{}
 	iphashes := map[string]int{}
+	filteredUsers := []J{}
 
 	for i, user := range users {
 		if iphashes[user.Get("iphash")] >= 3 {
@@ -304,8 +305,10 @@ func snapshot(ido string, size float64) (float64, []J) {
 			totalAllocations += allMultipliers[tier]
 		}
 		user["tier"] = tier
+		filteredUsers = append(filteredUsers, user)
 	}
 
+	users = filteredUsers
 	sort.Slice(users, func(i, j int) bool {
 		return users[i].Get("id") > users[j].Get("id")
 	})
