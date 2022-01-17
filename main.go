@@ -87,7 +87,7 @@ func main() {
 	//mux.HandleFunc("/kyc-start", handleKycStart)
 	//mux.HandleFunc("/admin/bots", handleAdminBots)
 	//mux.HandleFunc("/admin/kill-bots", handleAdminKillBots)
-	//mux.HandleFunc("/admin/snapshot", handleAdminSnapshot)
+	mux.HandleFunc("/admin/snapshot", handleAdminSnapshot)
 	mux.HandleFunc("/", handleIndex)
 	handler := middleware(mux.ServeHTTP)
 
@@ -522,90 +522,36 @@ func handleAdminKillBots(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
-	ido := strings.ToLower(r.URL.Query().Get("ido"))
-	addresses := DbSelect(`select address, address_terra, xrune, tier from registrations r where ido = $1 and xrune > 0 and bonus >= 0 and created_at <= $2 and address_terra != '' and starts_with(address_terra, 'terra') order by id`, ido, idoCutoff[ido])
-	totalAllocations := float64(0)
-	totalInTier := map[int]float64{}
-	for i, a := range addresses {
-		fmt.Println("fetching kyc", len(addresses), i+1, a)
-		kycVerified := false
-		sessions := DbSelect(`select id, session_id, verified from kyc where address in ($1, $2)`, a["address"].(string), a["address_terra"].(string))
-		for _, s := range sessions {
-			if s["verified"].(bool) {
-				kycVerified = true
-				continue
-			}
-			sessionId := s["session_id"].(string)
-			resInfo, err := synapsApiCall("GET", "/v3/session/info", sessionId)
-			if err == nil && resInfo["status"].(string) == "VERIFIED" {
-				kycVerified = true
-			}
-			if kycVerified {
-				db.MustExec(`update kyc set verified = true where id = $1`, s["id"].(string))
-			}
-		}
-		a["kyc"] = kycVerified
-		if !kycVerified {
-			continue
-		}
-
-		// if strings.HasPrefix(a["address"].(string), "0x") {
-		// 	fmt.Println("fetching tiers", len(addresses), i+1, a)
-		// 	data, err := contractTiers.Pack("userInfoTotal", common.HexToAddress(a["address"].(string)))
-		// 	Check(err)
-		// 	var resultStr string
-		// 	Check(clientEthereum.Call(&resultStr, "eth_call", map[string]interface{}{
-		// 		"from": ADDRESS_ZERO,
-		// 		"to":   contractTiersAddressEthereum,
-		// 		"data": hexutil.Bytes(data),
-		// 	}, "latest"))
-
-		// 	result, err := contractTiers.Unpack("userInfoTotal", hexutil.MustDecode(resultStr))
-		// 	Check(err)
-		// 	xruneb := result[1].(*big.Int)
-		// 	xruneb.Div(xruneb, big.NewInt(1000000000))
-		// 	xruneb.Div(xruneb, big.NewInt(1000000000))
-		// 	xruneb.Div(xruneb, big.NewInt(100))
-		// 	xruneb.Mul(xruneb, big.NewInt(100))
-		// 	xrune := float64(xruneb.Int64())
-		// 	tier := 0
-		// 	for i, v := range idoTiers[ido] {
-		// 		if xrune >= v {
-		// 			tier = i
-		// 		}
-		// 	}
-		// 	totalInTier[tier] += 1
-		// 	totalAllocations += idoTiersMul[ido][tier]
-		// 	a["xrune"] = xrune
-		// 	a["tier"] = tier
-		// } else {
-		tier := int(a["tier"].(int64))
-		totalInTier[tier] += 1
-		totalAllocations += idoTiersMul[ido][tier]
-		a["tier"] = tier
-		a["xrune"] = float64(a["xrune"].(int64))
-	}
-
-	baseAllocation := idoSize[ido] / totalAllocations
-	tierAllocations := map[int]float64{}
-	fmt.Fprintf(w, "total %.2f base %.2f tiers %#v\n", totalAllocations, baseAllocation, totalInTier)
-	fmt.Fprintf(w, "address,address_terra,xrune,tier,allocation\n")
-	for _, a := range addresses {
-		if !a["kyc"].(bool) {
-			continue
-		}
-		tier := a["tier"].(int)
-		allocation := float64(0)
-		if baseAllocation*idoTiersMul[ido][tier] > 100 {
-			allocation = baseAllocation * idoTiersMul[ido][tier]
-		} else {
-			tierAllocationCap := totalInTier[tier] * idoTiersMul[ido][tier] * baseAllocation
-			if tierAllocations[tier]+100 < tierAllocationCap {
-				allocation = 100
-				tierAllocations[tier] += 100
-			}
-		}
-		fmt.Fprintf(w, "%s,%s,%.2f,%d,%.2f\n", a["address"].(string), a["address_terra"].(string), a["xrune"].(float64), tier, allocation)
+	/*
+		  CHECK KYC
+				fmt.Println("fetching kyc", len(addresses), i+1, a)
+				kycVerified := false
+				sessions := DbSelect(`select id, session_id, verified from kyc where address in ($1, $2)`, a["address"].(string), a["address_terra"].(string))
+				for _, s := range sessions {
+					if s["verified"].(bool) {
+						kycVerified = true
+						continue
+					}
+					sessionId := s["session_id"].(string)
+					resInfo, err := synapsApiCall("GET", "/v3/session/info", sessionId)
+					if err == nil && resInfo["status"].(string) == "VERIFIED" {
+						kycVerified = true
+					}
+					if kycVerified {
+						db.MustExec(`update kyc set verified = true where id = $1`, s["id"].(string))
+					}
+				}
+				a["kyc"] = kycVerified
+	*/
+	baseAllocation, users := snapshot("ring", 400000)
+	fmt.Fprintf(w, "base %.2f\n", baseAllocation)
+	fmt.Fprintf(w, "address,total,tier,allocation\n")
+	for _, user := range users {
+		fmt.Fprintf(
+			w, "%s,%d,%d,%.2f\n",
+			user.Get("address"), user.GetInt("total"),
+			user.GetInt("tier"), user["allocation"].(float64),
+		)
 	}
 }
 
