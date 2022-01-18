@@ -277,7 +277,7 @@ func fetchUpdateUserAmounts(user J) {
 }
 
 func snapshot(ido string, size float64) (float64, []J) {
-	users := DbSelect(`select r.id, r.user_id, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 order by r.created_at`, ido)
+	users := DbSelect(`select r.id, r.user_id, u.address_ethereum, u.address_terra. u.address_fantom, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 order by r.created_at`, ido)
 
 	totalAllocations := float64(0)
 	totalInTier := map[int]float64{}
@@ -301,7 +301,10 @@ func snapshot(ido string, size float64) (float64, []J) {
 		}
 		totalInTier[tier] += 1
 		totalAllocations += allMultipliers[tier]
-		if strings.Contains(luart2x, user.Get("address")) {
+		isLuart2x := strings.Contains(luart2x, user.Get("address_ethereum")) ||
+			strings.Contains(luart2x, user.Get("address_fantom")) ||
+			strings.Contains(luart2x, user.Get("address_terra"))
+		if isLuart2x {
 			totalAllocations += allMultipliers[tier]
 		}
 		user["tier"] = tier
@@ -326,7 +329,10 @@ func snapshot(ido string, size float64) (float64, []J) {
 				tierAllocations[tier] += 100
 			}
 		}
-		if strings.Contains(luart2x, user.Get("address")) {
+		isLuart2x := strings.Contains(luart2x, user.Get("address_ethereum")) ||
+			strings.Contains(luart2x, user.Get("address_fantom")) ||
+			strings.Contains(luart2x, user.Get("address_terra"))
+		if isLuart2x {
 			allocation = allocation * 2
 		}
 		user["allocation"] = allocation
