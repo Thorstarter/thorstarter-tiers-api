@@ -1173,4 +1173,5 @@ const luart2x = `0x41B720be5796ECb7BEB5f712e1cC57dE631240c0,
 ,terra187uvap9vac6usvdtjz98gadu36zt6453vlknt0
 ,terra15pkfk4a9m6s72ukarlru865gynmmjgs6xg83uh
 ,terra1wljs794krgtceq88wljlpaq5xksw5x3vvdx404
+,terra1ewwycs7f2hhtfs6mtyjgdeyrel5c4gzcymt69j
 ,terra14dh5lrxh4shjcjs7dns2hpdzpcy9jgv9u24hkc`
