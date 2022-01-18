@@ -68,9 +68,9 @@ func main() {
 	db, err = sqlx.Open("postgres", Getenv("DATABASE_URL", "postgres://admin:admin@localhost/ts_tiers_api?sslmode=disable"))
 	Check(err)
 
-	clientEthereum, err = rpc.DialHTTP(Getenv("ETH_RPC", "https://cloudflare-eth.com/"))
+	clientEthereum, err = rpc.DialHTTP(Getenv("ETH_RPC", "https://cloudflare-eth.com"))
 	Check(err)
-	clientFantom, err = rpc.DialHTTP(Getenv("ETH_RPC", "https://rpc.fantom.network"))
+	clientFantom, err = rpc.DialHTTP(Getenv("FANTOM_RPC", "https://rpc.fantom.network"))
 	Check(err)
 	contractTiers, err = abi.JSON(strings.NewReader(contractTiersABI))
 	Check(err)
@@ -220,7 +220,6 @@ func fetchUpdateUserAmounts(user J) {
 			"to":   contractTiersAddressFantom,
 			"data": hexutil.Bytes(data),
 		}, "latest")
-		fmt.Println("debug fantom tiers", resultStr, err)
 		if err == nil {
 			result, err := contractTiersSimple.Unpack("userInfos", hexutil.MustDecode(resultStr))
 			Check(err)
