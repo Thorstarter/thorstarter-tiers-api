@@ -220,10 +220,11 @@ func fetchUpdateUserAmounts(user J) {
 			"to":   contractTiersAddressFantom,
 			"data": hexutil.Bytes(data),
 		}, "latest")
+		fmt.Println("debug fantom tiers", resultStr, err)
 		if err == nil {
 			result, err := contractTiersSimple.Unpack("userInfos", hexutil.MustDecode(resultStr))
 			Check(err)
-			amountb := result[1].(*big.Int)
+			amountb := result[0].(*big.Int)
 			amountb.Div(amountb, big.NewInt(1000000000))
 			amountb.Div(amountb, big.NewInt(1000000000))
 			user["amount_fantom"] = int(amountb.Int64())
@@ -341,6 +342,9 @@ func snapshot(ido string, size float64) (float64, []J) {
 		user["allocation"] = allocation
 	}
 
+	if baseAllocation > size {
+		baseAllocation = size
+	}
 	return baseAllocation, users
 }
 
