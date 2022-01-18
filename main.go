@@ -554,12 +554,15 @@ func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 	*/
 	baseAllocation, users := snapshot("ring", 400000)
 	fmt.Fprintf(w, "base %.2f\n", baseAllocation)
-	fmt.Fprintf(w, "address,total,tier,allocation\n")
+	fmt.Fprintf(w, "address,total,tier,allocation,address_ethereum,address_terra,address_fantom\n")
 	for _, user := range users {
 		fmt.Fprintf(
-			w, "%s,%d,%d,%.2f\n",
+			w, "%s,%d,%d,%.2f,%s,%s,%s\n",
 			user.Get("address"), user.GetInt("total"),
 			user.GetInt("tier"), user["allocation"].(float64),
+			user.Get("address_ethereum"),
+			user.Get("address_terra"),
+			user.Get("address_fantom"),
 		)
 	}
 }
