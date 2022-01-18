@@ -159,7 +159,7 @@ func handleUserFetch(w http.ResponseWriter, r *http.Request) {
 	for _, u := range snapshotUsers {
 		if u.Get("user_id") == user.Get("id") {
 			userInSnapshot = true
-			userAllocation = u.GetFloat("allocation")
+			userAllocation = u.GetFloat("possibleAllocation")
 			break
 		}
 	}
@@ -301,9 +301,9 @@ func snapshot(ido string, size float64) (float64, []J) {
 		}
 		totalInTier[tier] += 1
 		totalAllocations += allMultipliers[tier]
-		isLuart2x := strings.Contains(luart2x, user.Get("address_ethereum")) ||
-			strings.Contains(luart2x, user.Get("address_fantom")) ||
-			strings.Contains(luart2x, user.Get("address_terra"))
+		isLuart2x := (user.Get("address_ethereum") != "" && strings.Contains(luart2x, user.Get("address_ethereum"))) ||
+			(user.Get("address_terra") != "" && strings.Contains(luart2x, user.Get("address_terra"))) ||
+			(user.Get("address_fantom") != "" && strings.Contains(luart2x, user.Get("address_fantom")))
 		if isLuart2x {
 			totalAllocations += allMultipliers[tier]
 		}
@@ -322,16 +322,18 @@ func snapshot(ido string, size float64) (float64, []J) {
 		allocation := float64(0)
 		if baseAllocation*allMultipliers[tier] > 100 {
 			allocation = baseAllocation * allMultipliers[tier]
+			user["possibleAllocation"] = allocation
 		} else {
 			tierAllocationCap := totalInTier[tier] * allMultipliers[tier] * baseAllocation
 			if tierAllocations[tier]+100 < tierAllocationCap {
 				allocation = 100
 				tierAllocations[tier] += 100
 			}
+			user["possibleAllocation"] = allocation
 		}
-		isLuart2x := strings.Contains(luart2x, user.Get("address_ethereum")) ||
-			strings.Contains(luart2x, user.Get("address_fantom")) ||
-			strings.Contains(luart2x, user.Get("address_terra"))
+		isLuart2x := (user.Get("address_ethereum") != "" && strings.Contains(luart2x, user.Get("address_ethereum"))) ||
+			(user.Get("address_terra") != "" && strings.Contains(luart2x, user.Get("address_terra"))) ||
+			(user.Get("address_fantom") != "" && strings.Contains(luart2x, user.Get("address_fantom")))
 		if isLuart2x {
 			allocation = allocation * 2
 		}
