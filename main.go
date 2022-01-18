@@ -33,7 +33,7 @@ const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
 const contractTiersAddressEthereum = "0x817ba0ecafD58460bC215316a7831220BFF11C80"
 const contractTiersAddressFantom = "0xbc373f851d1EC6aaba27a9d039948D25a6EE8036"
 const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfoTotal","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
-const contractTiersSimpleABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfos","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
+const contractTiersSimpleABI = `[{"inputs": [{"internalType": "address","name": "","type": "address"}],"name": "userInfos","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
 
 var allTiers = []float64{0, 2500, 7500, 25000, 75000, 150000}
 var allMultipliers = []float64{0, 1, 2, 4, 8, 12}
@@ -221,7 +221,7 @@ func fetchUpdateUserAmounts(user J) {
 			"data": hexutil.Bytes(data),
 		}, "latest")
 		if err == nil {
-			result, err := contractTiers.Unpack("userInfos", hexutil.MustDecode(resultStr))
+			result, err := contractTiersSimple.Unpack("userInfos", hexutil.MustDecode(resultStr))
 			Check(err)
 			amountb := result[1].(*big.Int)
 			amountb.Div(amountb, big.NewInt(1000000000))
