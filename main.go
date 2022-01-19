@@ -32,7 +32,7 @@ const networks = "ethereum,terra,fantom,polygon,solana"
 const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
 const contractTiersAddressEthereum = "0x817ba0ecafD58460bC215316a7831220BFF11C80"
 const contractTiersAddressFantom = "0xbc373f851d1EC6aaba27a9d039948D25a6EE8036"
-const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfoTotal","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
+const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfoAmounts","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"},{ "internalType": "address[]", "name": "", "type": "address[]" }, { "internalType": "uint256[]", "name": "", "type": "uint256[]" }, { "internalType": "uint256[]", "name": "", "type": "uint256[]" }],"stateMutability": "view","type": "function"}]`
 const contractTiersSimpleABI = `[{"inputs": [{"internalType": "address","name": "","type": "address"}],"name": "userInfos","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
 
 var allTiers = []float64{0, 2500, 7500, 25000, 75000, 150000}
@@ -176,7 +176,7 @@ func handleUserFetch(w http.ResponseWriter, r *http.Request) {
 func fetchUpdateUserAmounts(user J) {
 	// Ethereum
 	if address := user.Get("address_ethereum"); address != "" {
-		data, err := contractTiers.Pack("userInfoTotal", common.HexToAddress(address))
+		data, err := contractTiers.Pack("userInfoAmounts", common.HexToAddress(address))
 		Check(err)
 		var resultStr string
 		err = clientEthereum.Call(&resultStr, "eth_call", map[string]interface{}{
@@ -185,9 +185,9 @@ func fetchUpdateUserAmounts(user J) {
 			"data": hexutil.Bytes(data),
 		}, "latest")
 		if err == nil {
-			result, err := contractTiers.Unpack("userInfoTotal", hexutil.MustDecode(resultStr))
+			result, err := contractTiers.Unpack("userInfoAmounts", hexutil.MustDecode(resultStr))
 			Check(err)
-			amountb := result[1].(*big.Int)
+			amountb := result[4].([]*big.Int)[0]
 			amountb.Div(amountb, big.NewInt(1000000000))
 			amountb.Div(amountb, big.NewInt(1000000000))
 			user["amount_ethereum"] = int(amountb.Int64())
@@ -245,17 +245,20 @@ func fetchUpdateUserAmounts(user J) {
 				}
 			}
 		} else {
-			res, err = httpGet("https://multichain-asgard-consumer-api.vercel.app/api/v3/member/poollist?address=" + address)
-			if err == nil {
-				for _, i := range res.([]interface{}) {
-					pool := i.(map[string]interface{})
-					if pool["pool"].(string) == poolName {
-						unitsStr = pool["poolunits"].(string)
+			log.Println("fetchUpdateUserAmounts: tclp:", address, err)
+			/*
+				res, err = httpGet("https://multichain-asgard-consumer-api.vercel.app/api/v3/member/poollist?address=" + address)
+				if err == nil {
+					for _, i := range res.([]interface{}) {
+						pool := i.(map[string]interface{})
+						if pool["pool"].(string) == poolName {
+							unitsStr = pool["poolunits"].(string)
+						}
 					}
+				} else {
+					log.Println("fetchUpdateUserAmounts: tclp:", address, err)
 				}
-			} else {
-				log.Println("fetchUpdateUserAmounts: tclp:", address, err)
-			}
+			*/
 		}
 
 		if unitsStr != "" {
