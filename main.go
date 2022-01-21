@@ -190,6 +190,9 @@ func fetchUpdateUserAmounts(user J) {
 			amountb := result[4].([]*big.Int)[0]
 			amountb.Div(amountb, big.NewInt(1000000000))
 			amountb.Div(amountb, big.NewInt(1000000000))
+			amountb.Div(amountb, big.NewInt(10))
+			amountb.Add(amountb, big.NewInt(1))
+			amountb.Mul(amountb, big.NewInt(10))
 			user["amount_ethereum"] = int(amountb.Int64())
 		} else {
 			log.Println("fetchUpdateUserAmounts: ethereum:", address, err)
