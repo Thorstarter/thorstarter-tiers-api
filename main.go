@@ -26,7 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-var currentIdoName = "rem"
+var currentIdoName = "remn"
 var currentIdoRaising = float64(200000)
 var currentIdoCutoff = time.Date(2022, 1, 27, 14, 30, 0, 0, time.UTC)
 var allTiers = []float64{0, 2500, 7500, 25000, 75000, 150000}
@@ -294,15 +294,15 @@ func snapshot(ido string, size float64) (float64, []J) {
 	filteredUsers := []J{}
 
 	for i, user := range users {
+		if len(user.Get("address")) != 42 || !strings.HasPrefix(user.Get("address"), "0x") {
+			log.Println("user excluded address", user.Get("user_id"), user.Get("address"))
+			continue
+		}
 		if iphashes[user.Get("iphash")] >= 3 {
 			log.Println("user excluded ip", user.Get("user_id"))
 			continue
 		}
 		iphashes[user.Get("iphash")]++
-		if len(user.Get("address")) != 42 || !strings.HasPrefix(user.Get("address"), "0x") {
-			log.Println("user excluded address", user.Get("user_id"), user.Get("address"))
-			continue
-		}
 
 		total := float64(user.GetInt("total"))
 		tier := int(0)
