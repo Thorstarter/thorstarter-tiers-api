@@ -335,17 +335,17 @@ func snapshot(ido string, size float64) (float64, []J) {
 	for _, user := range users {
 		tier := user.GetInt("tier")
 		allocation := float64(0)
-		if baseAllocation*allMultipliers[tier] > 100 {
-			allocation = baseAllocation * allMultipliers[tier]
-			user["possibleAllocation"] = allocation
-		} else {
-			tierAllocationCap := totalInTier[tier] * allMultipliers[tier] * baseAllocation
-			if tierAllocations[tier]+100 < tierAllocationCap {
-				allocation = 100
-				tierAllocations[tier] += 100
-			}
-			user["possibleAllocation"] = float64(100)
-		}
+		// if baseAllocation*allMultipliers[tier] > 100 {
+		allocation = baseAllocation * allMultipliers[tier]
+		user["possibleAllocation"] = allocation
+		// } else {
+		// 	tierAllocationCap := totalInTier[tier] * allMultipliers[tier] * baseAllocation
+		// 	if tierAllocations[tier]+100 < tierAllocationCap {
+		// 		allocation = 100
+		// 		tierAllocations[tier] += 100
+		// 	}
+		// 	user["possibleAllocation"] = float64(100)
+		// }
 		/*
 			isLuart2x := (user.Get("address_ethereum") != "" && strings.Contains(luart2x, user.Get("address_ethereum"))) ||
 				(user.Get("address_terra") != "" && strings.Contains(luart2x, user.Get("address_terra"))) ||
