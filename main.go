@@ -289,7 +289,7 @@ func snapshot(ido string, size float64) (float64, []J) {
 
 	totalAllocations := float64(0)
 	totalInTier := map[int]float64{}
-	tierAllocations := map[int]float64{}
+	//tierAllocations := map[int]float64{}
 	iphashes := map[string]int{}
 	filteredUsers := []J{}
 
