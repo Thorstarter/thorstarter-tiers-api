@@ -26,7 +26,13 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
-const allIdos = "mnet,luart,ring"
+var currentIdoName = "rem"
+var currentIdoRaising = float64(200000)
+var currentIdoCutoff = time.Date(2022, 1, 27, 14, 30, 0, 0, time.UTC)
+var allTiers = []float64{0, 2500, 7500, 25000, 75000, 150000}
+var allMultipliers = []float64{0, 1, 2, 4, 8, 12}
+
+const allIdos = "mnet,luart,ring,remn"
 const networks = "ethereum,terra,fantom,polygon,solana"
 
 const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
@@ -34,11 +40,6 @@ const contractTiersAddressEthereum = "0x817ba0ecafD58460bC215316a7831220BFF11C80
 const contractTiersAddressFantom = "0xbc373f851d1EC6aaba27a9d039948D25a6EE8036"
 const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfoAmounts","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"},{ "internalType": "address[]", "name": "", "type": "address[]" }, { "internalType": "uint256[]", "name": "", "type": "uint256[]" }, { "internalType": "uint256[]", "name": "", "type": "uint256[]" }],"stateMutability": "view","type": "function"}]`
 const contractTiersSimpleABI = `[{"inputs": [{"internalType": "address","name": "","type": "address"}],"name": "userInfos","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
-
-var currentIdoName = "rem"
-var currentIdoRaising = float64(200000)
-var allTiers = []float64{0, 2500, 7500, 25000, 75000, 150000}
-var allMultipliers = []float64{0, 1, 2, 4, 8, 12}
 
 var idoCutoff = map[string]time.Time{
 	"mnet":  time.Date(2021, 11, 24, 15, 0, 0, 0, time.UTC),
@@ -168,7 +169,6 @@ func handleUserFetch(w http.ResponseWriter, r *http.Request) {
 	RenderJson(w, 200, J{
 		"user":           user,
 		"registrations":  registrations,
-		"luart2x":        strings.Contains(luart2x, address),
 		"baseAllocation": baseAllocation,
 		"userInSnapshot": userInSnapshot,
 		"userAllocation": userAllocation,
@@ -285,7 +285,7 @@ func fetchUpdateUserAmounts(user J) {
 }
 
 func snapshot(ido string, size float64) (float64, []J) {
-	users := DbSelect(`select r.id, r.user_id, u.address_ethereum, u.address_terra, u.address_fantom, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 and r.created_at < '2022-01-27 14:30' order by r.created_at`, ido)
+	users := DbSelect(`select r.id, r.user_id, u.address_ethereum, u.address_terra, u.address_fantom, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 and r.created_at <= $2 order by r.created_at`, ido, currentIdoCutoff)
 
 	totalAllocations := float64(0)
 	totalInTier := map[int]float64{}
@@ -314,12 +314,14 @@ func snapshot(ido string, size float64) (float64, []J) {
 		}
 		totalInTier[tier] += 1
 		totalAllocations += allMultipliers[tier]
-		isLuart2x := (user.Get("address_ethereum") != "" && strings.Contains(luart2x, user.Get("address_ethereum"))) ||
-			(user.Get("address_terra") != "" && strings.Contains(luart2x, user.Get("address_terra"))) ||
-			(user.Get("address_fantom") != "" && strings.Contains(luart2x, user.Get("address_fantom")))
-		if isLuart2x {
-			totalAllocations += allMultipliers[tier]
-		}
+		/*
+			isLuart2x := (user.Get("address_ethereum") != "" && strings.Contains(luart2x, user.Get("address_ethereum"))) ||
+				(user.Get("address_terra") != "" && strings.Contains(luart2x, user.Get("address_terra"))) ||
+				(user.Get("address_fantom") != "" && strings.Contains(luart2x, user.Get("address_fantom")))
+			if isLuart2x {
+				totalAllocations += allMultipliers[tier]
+			}
+		*/
 		user["tier"] = tier
 		filteredUsers = append(filteredUsers, user)
 	}
@@ -344,13 +346,15 @@ func snapshot(ido string, size float64) (float64, []J) {
 			}
 			user["possibleAllocation"] = float64(100)
 		}
-		isLuart2x := (user.Get("address_ethereum") != "" && strings.Contains(luart2x, user.Get("address_ethereum"))) ||
-			(user.Get("address_terra") != "" && strings.Contains(luart2x, user.Get("address_terra"))) ||
-			(user.Get("address_fantom") != "" && strings.Contains(luart2x, user.Get("address_fantom")))
-		if isLuart2x {
-			allocation = allocation * 2
-			user["possibleAllocation"] = user.GetFloat("possibleAllocation") * 2
-		}
+		/*
+			isLuart2x := (user.Get("address_ethereum") != "" && strings.Contains(luart2x, user.Get("address_ethereum"))) ||
+				(user.Get("address_terra") != "" && strings.Contains(luart2x, user.Get("address_terra"))) ||
+				(user.Get("address_fantom") != "" && strings.Contains(luart2x, user.Get("address_fantom")))
+			if isLuart2x {
+				allocation = allocation * 2
+				user["possibleAllocation"] = user.GetFloat("possibleAllocation") * 2
+			}
+		*/
 		user["allocation"] = allocation
 	}
 
