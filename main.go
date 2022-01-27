@@ -285,7 +285,7 @@ func fetchUpdateUserAmounts(user J) {
 }
 
 func snapshot(ido string, size float64) (float64, []J) {
-	users := DbSelect(`select r.id, r.user_id, u.address_ethereum, u.address_terra, u.address_fantom, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 and r.created_at <= $2 order by r.created_at`, ido, currentIdoCutoff)
+	users := DbSelect(`select r.id, r.user_id, u.address_ethereum, u.address_terra, u.address_fantom, u.address_polygon, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 and r.created_at <= $2 order by r.created_at`, ido, currentIdoCutoff)
 
 	totalAllocations := float64(0)
 	totalInTier := map[int]float64{}
@@ -294,6 +294,9 @@ func snapshot(ido string, size float64) (float64, []J) {
 	filteredUsers := []J{}
 
 	for i, user := range users {
+		if user.GetInt("total") == 0 {
+			continue
+		}
 		if len(user.Get("address")) != 42 || !strings.HasPrefix(user.Get("address"), "0x") {
 			log.Println("user excluded address", user.Get("user_id"), user.Get("address"))
 			continue
@@ -579,47 +582,46 @@ func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 	baseAllocation, registrations := snapshot(currentIdoName, currentIdoRaising)
 	fmt.Fprintf(w, "base %.2f\n", baseAllocation)
 	fmt.Fprintf(w, "address,total,tier,allocation,address_ethereum,address_terra,address_fantom\n")
-	for _, r := range registrations {
+	for i, r := range registrations {
 
-		/*
-			// update everybody
-			func() {
-				defer func() {
-					if err := recover(); err != nil {
-						log.Println("panic on user", r.Get("user_id"), err)
-					}
-				}()
-				users := DbSelect("select * from users where id = $1", r.Get("user_id"))
-				user := users[0]
-				fetchUpdateUserAmounts(user)
-				user["updated_at"] = time.Now()
-				db.MustExec(
-					`insert into users (id, address_ethereum, address_terra, address_fantom, address_polygon, amount_ethereum, amount_terra, amount_fantom, amount_polygon, amount_tclp, amount_forge, iphash, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) on conflict (id) do update set address_ethereum = $2, address_terra = $3, address_fantom = $4, address_polygon = $5, amount_ethereum = $6, amount_terra = $7, amount_fantom = $8, amount_polygon = $9, amount_tclp = $10, amount_forge = $11, iphash = $12, updated_at = $13`,
-					user.Get("id"),
-					user.Get("address_ethereum"),
-					user.Get("address_terra"),
-					user.Get("address_fantom"),
-					user.Get("address_polygon"),
-					user.GetInt("amount_ethereum"),
-					user.GetInt("amount_terra"),
-					user.GetInt("amount_fantom"),
-					user.GetInt("amount_polygon"),
-					user.GetInt("amount_tclp"),
-					user.GetInt("amount_forge"),
-					user.Get("iphash"),
-					user.GetTime("updated_at"),
-				)
-				log.Println("done", i, "out of", len(registrations), r.Get("user_id"))
+		// update everybody
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Println("panic on user", r.Get("user_id"), err)
+				}
 			}()
-		*/
+			users := DbSelect("select * from users where id = $1", r.Get("user_id"))
+			user := users[0]
+			fetchUpdateUserAmounts(user)
+			user["updated_at"] = time.Now()
+			db.MustExec(
+				`insert into users (id, address_ethereum, address_terra, address_fantom, address_polygon, amount_ethereum, amount_terra, amount_fantom, amount_polygon, amount_tclp, amount_forge, iphash, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) on conflict (id) do update set address_ethereum = $2, address_terra = $3, address_fantom = $4, address_polygon = $5, amount_ethereum = $6, amount_terra = $7, amount_fantom = $8, amount_polygon = $9, amount_tclp = $10, amount_forge = $11, iphash = $12, updated_at = $13`,
+				user.Get("id"),
+				user.Get("address_ethereum"),
+				user.Get("address_terra"),
+				user.Get("address_fantom"),
+				user.Get("address_polygon"),
+				user.GetInt("amount_ethereum"),
+				user.GetInt("amount_terra"),
+				user.GetInt("amount_fantom"),
+				user.GetInt("amount_polygon"),
+				user.GetInt("amount_tclp"),
+				user.GetInt("amount_forge"),
+				user.Get("iphash"),
+				user.GetTime("updated_at"),
+			)
+			log.Println("done", i, "out of", len(registrations), r.Get("user_id"))
+		}()
 
 		fmt.Fprintf(
-			w, "%s,%d,%d,%.2f,%s,%s,%s\n",
+			w, "%s,%d,%d,%.2f,%s,%s,%s,%s\n",
 			r.Get("address"), r.GetInt("total"),
 			r.GetInt("tier"), r["allocation"].(float64),
 			r.Get("address_ethereum"),
 			r.Get("address_terra"),
 			r.Get("address_fantom"),
+			r.Get("address_polygon"),
 		)
 	}
 }
