@@ -8,32 +8,10 @@ import (
 )
 
 func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
-	/*
-		  CHECK KYC
-				fmt.Println("fetching kyc", len(addresses), i+1, a)
-				kycVerified := false
-				sessions := DbSelect(`select id, session_id, verified from kyc where address in ($1, $2)`, a["address"].(string), a["address_terra"].(string))
-				for _, s := range sessions {
-					if s["verified"].(bool) {
-						kycVerified = true
-						continue
-					}
-					sessionId := s["session_id"].(string)
-					resInfo, err := synapsApiCall("GET", "/v3/session/info", sessionId)
-					if err == nil && resInfo["status"].(string) == "VERIFIED" {
-						kycVerified = true
-					}
-					if kycVerified {
-						db.MustExec(`update kyc set verified = true where id = $1`, s["id"].(string))
-					}
-				}
-				a["kyc"] = kycVerified
-	*/
 	baseAllocation, registrations := snapshot(currentIdoName, currentIdoRaising)
-	fmt.Fprintf(w, "base %.2f\n", baseAllocation)
+	fmt.Fprintf(w, "base %.2f registrations %d\n", baseAllocation, len(registrations))
 	fmt.Fprintf(w, "address,total,tier,allocation,address_ethereum,address_terra,address_fantom\n")
 	for _, r := range registrations {
-
 		/*
 			// update everybody
 			func() {
@@ -96,6 +74,38 @@ func snapshot(ido string, size float64) (float64, []J) {
 			continue
 		}
 		iphashes[user.Get("iphash")]++
+
+    // CHECK KYC
+		address := user.Get("address_ethereum")
+		if address == "" {
+			address = user.Get("address_terra")
+		}
+		if address == "" {
+			address = user.Get("address_fantom")
+		}
+
+		fmt.Println("fetching kyc", len(users), i+1)
+		kycVerified := false
+		sessions := DbSelect(`select id, session_id, verified from kyc where address = $1`, address)
+		for _, s := range sessions {
+			if s["verified"].(bool) {
+				kycVerified = true
+				continue
+			}
+      continue
+			sessionId := s["session_id"].(string)
+			resInfo, err := synapsApiCall("GET", "/v3/session/info", sessionId)
+			if err == nil && resInfo["status"].(string) == "VERIFIED" {
+				kycVerified = true
+			}
+			if kycVerified {
+				db.MustExec(`update kyc set verified = true where id = $1`, s["id"].(string))
+			}
+		}
+		if !kycVerified {
+			fmt.Println("not kyced", user.Get("user_id"))
+			continue
+		}
 
 		total := float64(user.GetInt("total"))
 		tier := int(0)
