@@ -127,7 +127,7 @@ func snapshot(ido string, size float64) (float64, []J) {
 		tier := user.GetInt("tier")
 		allocation := float64(0)
 		allocation = baseAllocation * allMultipliers[tier]
-		if allocation < 100 {
+		if baseAllocation*allMultipliers[tier] > 100 {
 			user["possibleAllocation"] = allocation
 		} else {
 			tierAllocationCap := totalInTier[tier] * allMultipliers[tier] * baseAllocation
