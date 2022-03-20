@@ -21,20 +21,22 @@ import (
 )
 
 var registrationAddressType = "evm" // evm / terra
-var currentIdoName = "detf"
-var currentIdoRaising = float64(300000)
-var currentIdoCutoff = time.Date(2022, 2, 24, 13, 30, 0, 0, time.UTC)
+var currentIdoName = "utbets"
+var currentIdoRaising = float64(600000)
+var currentIdoCutoff = time.Date(2022, 3, 22, 13, 30, 0, 0, time.UTC)
 var allTiers = []float64{0, 2500, 7500, 25000, 50000, 100000}
 var allMultipliers = []float64{0, 1, 3, 10, 20, 40}
 
-const allIdos = "mnet,luart,ring,remn,mint,detf"
+const allIdos = "mnet,luart,ring,remn,mint,detf,utbets"
 const networks = "ethereum,terra,fantom,polygon,solana"
 
 const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
 const contractTiersAddressEthereum = "0x817ba0ecafD58460bC215316a7831220BFF11C80"
 const contractTiersAddressFantom = "0xbc373f851d1EC6aaba27a9d039948D25a6EE8036"
+const contractForgeFantom = "0x2D23039c1bA153C6afcF7CaB9ad4570bCbF80F56"
 const contractTiersABI = `[{"inputs": [{"internalType": "address","name": "user","type": "address"}],"name": "userInfoAmounts","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"},{ "internalType": "address[]", "name": "", "type": "address[]" }, { "internalType": "uint256[]", "name": "", "type": "uint256[]" }, { "internalType": "uint256[]", "name": "", "type": "uint256[]" }],"stateMutability": "view","type": "function"}]`
 const contractTiersSimpleABI = `[{"inputs": [{"internalType": "address","name": "","type": "address"}],"name": "userInfos","outputs": [{"internalType": "uint256","name": "","type": "uint256"},{"internalType": "uint256","name": "","type": "uint256"}],"stateMutability": "view","type": "function"}]`
+const contractForgeABI = `[{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserInfo","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}]`
 
 type J map[string]interface{}
 
@@ -43,6 +45,7 @@ var clientEthereum *rpc.Client
 var clientFantom *rpc.Client
 var contractTiers abi.ABI
 var contractTiersSimple abi.ABI
+var contractForge abi.ABI
 
 func main() {
 	var err error
@@ -56,6 +59,8 @@ func main() {
 	contractTiers, err = abi.JSON(strings.NewReader(contractTiersABI))
 	Check(err)
 	contractTiersSimple, err = abi.JSON(strings.NewReader(contractTiersSimpleABI))
+	Check(err)
+	contractForge, err = abi.JSON(strings.NewReader(contractForgeABI))
 	Check(err)
 
 	mux := http.NewServeMux()

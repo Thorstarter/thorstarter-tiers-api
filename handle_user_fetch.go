@@ -125,24 +125,51 @@ func fetchUpdateUserAmounts(user J) {
 
 	// Fantom
 	if address := user.Get("address_fantom"); address != "" {
-		data, err := contractTiersSimple.Pack("userInfos", common.HexToAddress(address))
-		Check(err)
-		var resultStr string
-		err = clientFantom.Call(&resultStr, "eth_call", map[string]interface{}{
-			"from": ADDRESS_ZERO,
-			"to":   contractTiersAddressFantom,
-			"data": hexutil.Bytes(data),
-		}, "latest")
-		if err == nil {
-			result, err := contractTiersSimple.Unpack("userInfos", hexutil.MustDecode(resultStr))
+		amount := big.NewInt(0)
+
+		{
+			data, err := contractTiersSimple.Pack("userInfos", common.HexToAddress(address))
 			Check(err)
-			amountb := result[0].(*big.Int)
-			amountb.Div(amountb, big.NewInt(1000000000))
-			amountb.Div(amountb, big.NewInt(1000000000))
-			user["amount_fantom"] = int(amountb.Int64())
-		} else {
-			log.Println("fetchUpdateUserAmounts: fantom:", address, err)
+			var resultStr string
+			err = clientFantom.Call(&resultStr, "eth_call", map[string]interface{}{
+				"from": ADDRESS_ZERO,
+				"to":   contractTiersAddressFantom,
+				"data": hexutil.Bytes(data),
+			}, "latest")
+			if err == nil {
+				result, err := contractTiersSimple.Unpack("userInfos", hexutil.MustDecode(resultStr))
+				Check(err)
+				amountb := result[0].(*big.Int)
+				amountb.Div(amountb, big.NewInt(1000000000))
+				amountb.Div(amountb, big.NewInt(1000000000))
+				amount.Add(amount, amountb)
+			} else {
+				log.Println("fetchUpdateUserAmounts: fantom:", address, err)
+			}
 		}
+
+		{
+			data, err := contractForge.Pack("getUserInfo", common.HexToAddress(address))
+			Check(err)
+			var resultStr string
+			err = clientFantom.Call(&resultStr, "eth_call", map[string]interface{}{
+				"from": ADDRESS_ZERO,
+				"to":   contractForgeFantom,
+				"data": hexutil.Bytes(data),
+			}, "latest")
+			if err == nil {
+				result, err := contractForge.Unpack("getUserInfo", hexutil.MustDecode(resultStr))
+				Check(err)
+				amountb := result[0].(*big.Int)
+				amountb.Div(amountb, big.NewInt(1000000000))
+				amountb.Div(amountb, big.NewInt(1000000000))
+				amount.Add(amount, amountb)
+			} else {
+				log.Println("fetchUpdateUserAmounts: fantom:", address, err)
+			}
+		}
+
+		user["amount_fantom"] = int(amount.Int64())
 	}
 
 	// TC LP
