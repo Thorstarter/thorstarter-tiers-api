@@ -64,7 +64,7 @@ func handleUserFetch(w http.ResponseWriter, r *http.Request) {
 
 	delete(user, "iphash")
 	registrations := DbSelect("select * from users_registrations where user_id = $1", user.Get("id"))
-	baseAllocation, snapshotUsers := snapshot(currentIdoName, currentIdoRaising)
+	baseAllocation, snapshotUsers := snapshot(currentIdoName, currentIdoRaising, false)
 	userInSnapshot := false
 	userAllocation := float64(0)
 	for _, u := range snapshotUsers {

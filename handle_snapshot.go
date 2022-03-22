@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
+	"time"
 )
 
 func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
-	baseAllocation, registrations := snapshot(currentIdoName, currentIdoRaising)
+	baseAllocation, registrations := snapshot(currentIdoName, currentIdoRaising, false)
 	fmt.Fprintf(w, "base %.2f registrations %d\n", baseAllocation, len(registrations))
 	fmt.Fprintf(w, "address,total,tier,allocation,address_ethereum,address_terra,address_fantom\n")
 	for _, r := range registrations {
@@ -22,8 +24,12 @@ func handleAdminSnapshot(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 }
+func handleAdminSnapshotUpdate(w http.ResponseWriter, r *http.Request) {
+	snapshot(currentIdoName, currentIdoRaising, true)
+	w.Write([]byte("ok"))
+}
 
-func snapshot(ido string, size float64) (float64, []J) {
+func snapshot(ido string, size float64, update bool) (float64, []J) {
 	users := DbSelect(`select r.id, r.user_id, u.address_ethereum, u.address_terra, u.address_fantom, u.address_polygon, r.address, u.iphash, (u.amount_ethereum + u.amount_terra + u.amount_fantom + u.amount_polygon + u.amount_tclp + u.amount_forge) as total from users_registrations r inner join users u on u.id = r.user_id where r.ido = $1 and r.created_at <= $2 order by total desc, r.created_at`, ido, currentIdoCutoff)
 
 	totalAllocations := float64(0)
@@ -38,8 +44,8 @@ func snapshot(ido string, size float64) (float64, []J) {
 		}
 		iphashes[user.Get("iphash")]++
 
-		/*
-			// UPDATE ALLOCATION
+		// Update allocations from onchain data
+		if update {
 			func() {
 				defer func() {
 					if err := recover(); err != nil {
@@ -69,7 +75,7 @@ func snapshot(ido string, size float64) (float64, []J) {
 				)
 				log.Println("done", i, "out of", len(users), r.Get("user_id"))
 			}()
-			/**/
+		}
 
 		/*
 		   // CHECK KYC

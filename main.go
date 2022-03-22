@@ -68,6 +68,7 @@ func main() {
 	mux.HandleFunc("/user-register", handleUserRegister)
 	mux.HandleFunc("/kyc", handleKyc)
 	mux.HandleFunc("/admin/snapshot", handleAdminSnapshot)
+	mux.HandleFunc("/admin/snapshot/update", handleAdminSnapshotUpdate)
 	mux.HandleFunc("/", handleIndex)
 	handler := middleware(mux.ServeHTTP)
 
