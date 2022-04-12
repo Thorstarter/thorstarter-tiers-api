@@ -173,7 +173,11 @@ func fetchUpdateUserAmounts(user J) {
 	}
 
 	// TC LP
-	if address := user.Get("address_ethereum"); address != "" {
+	tcAddress := user.Get("address_ethereum")
+	if tcAddress == "" {
+		tcAddress = user.Get("address_fantom")
+	}
+	if address := tcAddress; address != "" {
 		unitsStr := ""
 		poolName := "ETH.XRUNE-0X69FA0FEE221AD11012BAB0FDB45D444D3D2CE71C"
 		res, err := httpGet("https://midgard.thorchain.info/v2/member/" + address)
