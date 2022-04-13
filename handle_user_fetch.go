@@ -43,23 +43,7 @@ func handleUserFetch(w http.ResponseWriter, r *http.Request) {
 
 	if refresh || time.Now().Sub(user.GetTime("updated_at")) > 30*time.Minute {
 		fetchUpdateUserAmounts(user)
-		user["updated_at"] = time.Now()
-		db.MustExec(
-			`insert into users (id, address_ethereum, address_terra, address_fantom, address_polygon, amount_ethereum, amount_terra, amount_fantom, amount_polygon, amount_tclp, amount_forge, iphash, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) on conflict (id) do update set address_ethereum = $2, address_terra = $3, address_fantom = $4, address_polygon = $5, amount_ethereum = $6, amount_terra = $7, amount_fantom = $8, amount_polygon = $9, amount_tclp = $10, amount_forge = $11, iphash = $12, updated_at = $13`,
-			user.Get("id"),
-			user.Get("address_ethereum"),
-			user.Get("address_terra"),
-			user.Get("address_fantom"),
-			user.Get("address_polygon"),
-			user.GetInt("amount_ethereum"),
-			user.GetInt("amount_terra"),
-			user.GetInt("amount_fantom"),
-			user.GetInt("amount_polygon"),
-			user.GetInt("amount_tclp"),
-			user.GetInt("amount_forge"),
-			user.Get("iphash"),
-			user.GetTime("updated_at"),
-		)
+		saveUser(user)
 	}
 
 	delete(user, "iphash")
@@ -121,6 +105,16 @@ func fetchUpdateUserAmounts(user J) {
 		} else {
 			log.Println("fetchUpdateUserAmounts: terra:", address, err)
 		}
+		b64query = base64.URLEncoding.EncodeToString([]byte(`{"thorstarter_terra_boost":{"terra_address":"` + address + `"}}`))
+		result, err = httpGet(`https://fcd.terra.dev/terra/wasm/v1beta1/contracts/terra10pxt36lyy6rhsumw7j8lahwvwrre7fxrfktgjl/store?query_msg=` + b64query)
+		if err == nil {
+			state := result.(map[string]interface{})["query_result"].(string)
+			balance := big.NewInt(int64(MustParseInt(state)))
+			balance.Div(balance, big.NewInt(1000000))
+			user["amount_mintdao"] = int(balance.Int64())
+		} else {
+			log.Println("fetchUpdateUserAmounts: terra mintdao:", address, err)
+		}
 	}
 
 	// Fantom
@@ -145,6 +139,17 @@ func fetchUpdateUserAmounts(user J) {
 				amount.Add(amount, amountb)
 			} else {
 				log.Println("fetchUpdateUserAmounts: fantom:", address, err)
+			}
+
+			b64query := base64.URLEncoding.EncodeToString([]byte(`{"thorstarter_eth_boost":{"eth_address":"` + address + `"}}`))
+			result, err := httpGet(`https://fcd.terra.dev/terra/wasm/v1beta1/contracts/terra10pxt36lyy6rhsumw7j8lahwvwrre7fxrfktgjl/store?query_msg=` + b64query)
+			if err == nil {
+				state := result.(map[string]interface{})["query_result"].(string)
+				balance := big.NewInt(int64(MustParseInt(state)))
+				balance.Div(balance, big.NewInt(1000000))
+				user["amount_mintdao"] = int(balance.Int64())
+			} else {
+				log.Println("fetchUpdateUserAmounts: fantom mintdao:", address, err)
 			}
 		}
 
@@ -221,4 +226,25 @@ func fetchUpdateUserAmounts(user J) {
 			}
 		}
 	}
+}
+
+func saveUser(user J) {
+	user["updated_at"] = time.Now()
+	db.MustExec(
+		`insert into users (id, address_ethereum, address_terra, address_fantom, address_polygon, amount_ethereum, amount_terra, amount_fantom, amount_polygon, amount_tclp, amount_forge, amount_mintdao, iphash, updated_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) on conflict (id) do update set address_ethereum = $2, address_terra = $3, address_fantom = $4, address_polygon = $5, amount_ethereum = $6, amount_terra = $7, amount_fantom = $8, amount_polygon = $9, amount_tclp = $10, amount_forge = $11, amount_mintdao = $12, iphash = $13, updated_at = $14`,
+		user.Get("id"),
+		user.Get("address_ethereum"),
+		user.Get("address_terra"),
+		user.Get("address_fantom"),
+		user.Get("address_polygon"),
+		user.GetInt("amount_ethereum"),
+		user.GetInt("amount_terra"),
+		user.GetInt("amount_fantom"),
+		user.GetInt("amount_polygon"),
+		user.GetInt("amount_tclp"),
+		user.GetInt("amount_forge"),
+		user.GetInt("amount_mintdao"),
+		user.Get("iphash"),
+		user.GetTime("updated_at"),
+	)
 }

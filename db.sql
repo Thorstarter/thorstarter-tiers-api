@@ -31,6 +31,7 @@ create table users (
   amount_polygon int not null,
   amount_tclp int not null,
   amount_forge int not null,
+  amount_mintdao int not null,
   iphash text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
