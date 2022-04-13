@@ -34,7 +34,7 @@ func snapshot(ido string, size float64, update bool) (float64, []J) {
 
 	totalAllocations := float64(0)
 	totalInTier := map[int]float64{}
-	tierAllocations := map[int]float64{}
+	//tierAllocations := map[int]float64{}
 	iphashes := map[string]int{}
 	filteredUsers := []J{}
 
@@ -133,18 +133,20 @@ func snapshot(ido string, size float64, update bool) (float64, []J) {
 		tier := user.GetInt("tier")
 		allocation := float64(0)
 		allocation = baseAllocation * allMultipliers[tier]
-		if baseAllocation*allMultipliers[tier] > 100 {
-			user["possibleAllocation"] = allocation
-		} else {
-			tierAllocationCap := totalInTier[tier] * allMultipliers[tier] * baseAllocation
-			if tierAllocations[tier]+100 < tierAllocationCap {
-				allocation = 100
-				tierAllocations[tier] += 100
+		//if baseAllocation*allMultipliers[tier] > 100 {
+		user["possibleAllocation"] = allocation
+		/*
 			} else {
-				allocation = 0
+				tierAllocationCap := totalInTier[tier] * allMultipliers[tier] * baseAllocation
+				if tierAllocations[tier]+100 < tierAllocationCap {
+					allocation = 100
+					tierAllocations[tier] += 100
+				} else {
+					allocation = 0
+				}
+				user["possibleAllocation"] = float64(100)
 			}
-			user["possibleAllocation"] = float64(100)
-		}
+		*/
 		user["allocation"] = allocation
 	}
 
