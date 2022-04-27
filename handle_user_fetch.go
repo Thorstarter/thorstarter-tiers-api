@@ -140,17 +140,6 @@ func fetchUpdateUserAmounts(user J) {
 			} else {
 				log.Println("fetchUpdateUserAmounts: fantom:", address, err)
 			}
-
-			b64query := base64.URLEncoding.EncodeToString([]byte(`{"thorstarter_eth_boost":{"eth_address":"` + address + `"}}`))
-			result, err := httpGet(`https://fcd.terra.dev/terra/wasm/v1beta1/contracts/terra10pxt36lyy6rhsumw7j8lahwvwrre7fxrfktgjl/store?query_msg=` + b64query)
-			if err == nil {
-				state := result.(map[string]interface{})["query_result"].(string)
-				balance := big.NewInt(int64(MustParseInt(state)))
-				balance.Div(balance, big.NewInt(1000000))
-				user["amount_mintdao"] = int(balance.Int64())
-			} else {
-				log.Println("fetchUpdateUserAmounts: fantom mintdao:", address, err)
-			}
 		}
 
 		{
@@ -182,6 +171,21 @@ func fetchUpdateUserAmounts(user J) {
 	if tcAddress == "" {
 		tcAddress = user.Get("address_fantom")
 	}
+
+  // MintDAO Shields NFT
+	if address := tcAddress; address != "" {
+		b64query := base64.URLEncoding.EncodeToString([]byte(`{"thorstarter_eth_boost":{"eth_address":"` + address + `"}}`))
+		result, err := httpGet(`https://fcd.terra.dev/terra/wasm/v1beta1/contracts/terra10pxt36lyy6rhsumw7j8lahwvwrre7fxrfktgjl/store?query_msg=` + b64query)
+		if err == nil {
+			state := result.(map[string]interface{})["query_result"].(string)
+			balance := big.NewInt(int64(MustParseInt(state)))
+			balance.Div(balance, big.NewInt(1000000))
+			user["amount_mintdao"] = int(balance.Int64())
+		} else {
+			log.Println("fetchUpdateUserAmounts: fantom mintdao:", address, err)
+		}
+	}
+
 	if address := tcAddress; address != "" {
 		unitsStr := ""
 		poolName := "ETH.XRUNE-0X69FA0FEE221AD11012BAB0FDB45D444D3D2CE71C"
