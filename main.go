@@ -21,13 +21,13 @@ import (
 )
 
 var registrationAddressType = "evm" // evm / terra
-var currentIdoName = "champ"
-var currentIdoRaising = float64(250000)
-var currentIdoCutoff = time.Date(2022, 4, 19, 13, 30, 0, 0, time.UTC)
+var currentIdoName = "kol"
+var currentIdoRaising = float64(300000)
+var currentIdoCutoff = time.Date(2022, 5, 3, 13, 30, 0, 0, time.UTC)
 var allTiers = []float64{0, 2500, 7500, 25000, 50000, 100000}
 var allMultipliers = []float64{0, 1, 3, 10, 20, 40}
 
-const allIdos = "mnet,luart,ring,remn,mint,detf,utbets,proteus,champ"
+const allIdos = "mnet,luart,ring,remn,mint,detf,utbets,proteus,champ,kol"
 const networks = "ethereum,terra,fantom,polygon,solana"
 
 const ADDRESS_ZERO = "0x0000000000000000000000000000000000000000"
