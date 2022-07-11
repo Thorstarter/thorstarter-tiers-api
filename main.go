@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -26,6 +28,7 @@ var currentIdoRaising = float64(300000)
 var currentIdoCutoff = time.Date(2022, 5, 3, 13, 30, 0, 0, time.UTC)
 var allTiers = []float64{0, 2500, 7500, 25000, 50000, 100000}
 var allMultipliers = []float64{0, 1, 3, 10, 20, 40}
+var privateKey *ecdsa.PrivateKey
 
 const allIdos = "mnet,luart,ring,remn,mint,detf,utbets,proteus,champ,kol"
 const networks = "ethereum,terra,fantom,polygon,solana"
@@ -63,7 +66,11 @@ func main() {
 	contractForge, err = abi.JSON(strings.NewReader(contractForgeABI))
 	Check(err)
 
+	privateKey, err = crypto.HexToECDSA(Getenv("PRIVATE_KEY", "7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"))
+	Check(err)
+
 	mux := http.NewServeMux()
+	mux.HandleFunc("/user-signed-score", handleUserSignedScore)
 	mux.HandleFunc("/user-fetch", handleUserFetch)
 	mux.HandleFunc("/user-register", handleUserRegister)
 	mux.HandleFunc("/kyc", handleKyc)
@@ -147,7 +154,7 @@ func SUUID() string {
 }
 
 func RenderJson(w http.ResponseWriter, code int, v interface{}) {
-	bs, err := json.Marshal(v)
+	bs, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		RenderJson(w, 500, J{"error": err.Error()})
 	}
