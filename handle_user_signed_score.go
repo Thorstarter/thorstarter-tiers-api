@@ -13,6 +13,7 @@ import (
 
 func handleUserSignedScore(w http.ResponseWriter, r *http.Request) {
 	address := r.URL.Query().Get("address")
+	deadline := r.URL.Query().Get("deadline")
 	refresh := r.URL.Query().Get("refresh") == "1"
 	user := J{"id": SUUID(), "updated_at": time.Now().Add(-1 * time.Hour)}
 	users := DbSelect("select * from users where (address_ethereum = $1 or address_fantom = $1)", address)
@@ -34,13 +35,17 @@ func handleUserSignedScore(w http.ResponseWriter, r *http.Request) {
 		user.GetInt("amount_forge") +
 		user.GetInt("amount_mintdao")
 	scoreBytes := make([]byte, 32)
-	totalScore = 23000
 	binary.BigEndian.PutUint64(scoreBytes[24:], uint64(totalScore))
 	addressBytes := common.HexToAddress(address)
+	deadlineBytes := make([]byte, 32)
+	deadlineInt, err := strconv.ParseInt(deadline, 10, 64)
+	Check(err)
+	binary.BigEndian.PutUint64(deadlineBytes[24:], uint64(deadlineInt))
 
 	values := bytes.NewBuffer(nil)
 	values.Write(addressBytes.Bytes())
 	values.Write(scoreBytes)
+	values.Write(deadlineBytes)
 	valuesBytes := crypto.Keccak256(values.Bytes())
 	input := bytes.NewBufferString("\x19Ethereum Signed Message:\n")
 	input.Write([]byte(strconv.Itoa(len(valuesBytes))))
@@ -51,6 +56,9 @@ func handleUserSignedScore(w http.ResponseWriter, r *http.Request) {
 	signatureBytes[len(signatureBytes)-1] = 27
 	signature := common.Bytes2Hex(signatureBytes)
 	RenderJson(w, 200, J{
-		"user": user, "score": totalScore, "signature": signature,
+		"user":      user,
+		"score":     totalScore,
+		"deadline":  deadlineInt,
+		"signature": signature,
 	})
 }
