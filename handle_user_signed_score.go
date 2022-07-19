@@ -53,7 +53,7 @@ func handleUserSignedScore(w http.ResponseWriter, r *http.Request) {
 	hash := crypto.Keccak256(input.Bytes())
 	signatureBytes, err := crypto.Sign(hash, privateKey)
 	Check(err)
-	signatureBytes[len(signatureBytes)-1] = 27
+	signatureBytes[len(signatureBytes)-1] = signatureBytes[len(signatureBytes)-1] + 27
 	signature := common.Bytes2Hex(signatureBytes)
 	RenderJson(w, 200, J{
 		"user":      user,
